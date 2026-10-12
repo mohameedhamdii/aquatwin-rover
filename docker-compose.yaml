@@ -1,0 +1,49 @@
+version: '3.8'
+
+services:
+  # InfluxDB 2.x Time-Series Database
+  influxdb:
+    image: influxdb:2.7-alpine
+    container_name: aquatwin-influxdb
+    restart: unless-stopped
+    ports:
+      - "8086:8086"
+    environment:
+      - DOCKER_INFLUXDB_INIT_MODE=setup
+      - DOCKER_INFLUXDB_INIT_USERNAME=admin
+      - DOCKER_INFLUXDB_INIT_PASSWORD=waterquality12345
+      - DOCKER_INFLUXDB_INIT_ORG=water_quality_org
+      - DOCKER_INFLUXDB_INIT_BUCKET=water_quality_data
+      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=waterquality-dev-token-secret-2024
+    volumes:
+      - influxdb_data:/var/lib/influxdb2
+    healthcheck:
+      test: ["CMD", "influx", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # FastAPI Backend Telemetry Service & WebSocket Server
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: aquatwin-backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - PYTHONUNBUFFERED=1
+      - INFLUXDB_URL=http://influxdb:8086
+      - INFLUXDB_TOKEN=waterquality-dev-token-secret-2024
+      - INFLUXDB_ORG=water_quality_org
+      - INFLUXDB_BUCKET=water_quality_data
+    depends_on:
+      influxdb:
+        condition: service_healthy
+    volumes:
+      - ./data:/app/data
+      - ./dashboard:/app/dashboard
+
+volumes:
+  influxdb_data:

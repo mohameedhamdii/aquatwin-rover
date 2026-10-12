@@ -1,0 +1,86 @@
+solid buoy_hull
+  facet normal 0.0 -1.0 0.0
+    outer loop
+      vertex -60.0 -30.0 -60.0
+      vertex 60.0 -30.0 -60.0
+      vertex 60.0 -30.0 60.0
+    endloop
+  endfacet
+  facet normal 0.0 -1.0 0.0
+    outer loop
+      vertex -60.0 -30.0 -60.0
+      vertex 60.0 -30.0 60.0
+      vertex -60.0 -30.0 60.0
+    endloop
+  endfacet
+  facet normal 0.0 1.0 0.0
+    outer loop
+      vertex -80.0 20.0 -80.0
+      vertex 80.0 20.0 80.0
+      vertex 80.0 20.0 -80.0
+    endloop
+  endfacet
+  facet normal 0.0 1.0 0.0
+    outer loop
+      vertex -80.0 20.0 -80.0
+      vertex -80.0 20.0 80.0
+      vertex 80.0 20.0 80.0
+    endloop
+  endfacet
+  facet normal 0.0 0.371 -0.928
+    outer loop
+      vertex -60.0 -30.0 -60.0
+      vertex -80.0 20.0 -80.0
+      vertex 80.0 20.0 -80.0
+    endloop
+  endfacet
+  facet normal 0.0 0.371 -0.928
+    outer loop
+      vertex -60.0 -30.0 -60.0
+      vertex 80.0 20.0 -80.0
+      vertex 60.0 -30.0 -60.0
+    endloop
+  endfacet
+  facet normal 0.928 0.371 0.0
+    outer loop
+      vertex 60.0 -30.0 -60.0
+      vertex 80.0 20.0 -80.0
+      vertex 80.0 20.0 80.0
+    endloop
+  endfacet
+  facet normal 0.928 0.371 0.0
+    outer loop
+      vertex 60.0 -30.0 -60.0
+      vertex 80.0 20.0 80.0
+      vertex 60.0 -30.0 60.0
+    endloop
+  endfacet
+  facet normal 0.0 0.371 0.928
+    outer loop
+      vertex 60.0 -30.0 60.0
+      vertex 80.0 20.0 80.0
+      vertex -80.0 20.0 80.0
+    endloop
+  endfacet
+  facet normal 0.0 0.371 0.928
+    outer loop
+      vertex 60.0 -30.0 60.0
+      vertex -80.0 20.0 80.0
+      vertex -60.0 -30.0 60.0
+    endloop
+  endfacet
+  facet normal -0.928 0.371 0.0
+    outer loop
+      vertex -60.0 -30.0 60.0
+      vertex -80.0 20.0 80.0
+      vertex -80.0 20.0 -80.0
+    endloop
+  endfacet
+  facet normal -0.928 0.371 0.0
+    outer loop
+      vertex -60.0 -30.0 60.0
+      vertex -80.0 20.0 -80.0
+      vertex -60.0 -30.0 -60.0
+    endloop
+  endfacet
+endsolid buoy_hull

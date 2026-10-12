@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AquaTwin 3D — Autonomous Water Quality Rover & Digital Twin</title>
+    <meta name="description" content="Live 3D Digital Twin and Telemetry Dashboard for Autonomous Solar-Powered Water Quality Monitoring Rover/Buoy with EKF Contamination Anomaly Detection.">
+
+    <!-- Google Fonts: Inter and Outfit -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;600;700;800&display=swap" rel="stylesheet">
+
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Main Stylesheet -->
+    <link rel="stylesheet" href="css/style.css">
+
+    <!-- Three.js and OrbitControls -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body>
+    <div id="app-container">
+        <!-- 3D Canvas Background -->
+        <canvas id="webgl-canvas"></canvas>
+
+        <!-- Anomaly Warning Banner (Appears when contamination is detected) -->
+        <div id="anomaly-banner" class="anomaly-banner hidden">
+            <div class="banner-content">
+                <i class="fa-solid fa-triangle-exclamation pulse-icon"></i>
+                <div class="banner-text">
+                    <h4 id="banner-title">CONTAMINATION ANOMALY DETECTED</h4>
+                    <p id="banner-desc">Extended Kalman Filter Innovation (NIS: 16.4) exceeded safety threshold (13.28).</p>
+                </div>
+            </div>
+            <button id="btn-dismiss-banner" class="btn-banner-action" title="Dismiss Banner">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+
+        <!-- Top Navigation & Status Bar -->
+        <header id="top-navbar">
+            <div class="nav-left">
+                <div class="brand-logo">
+                    <i class="fa-solid fa-water-ladder logo-icon"></i>
+                    <div class="brand-titles">
+                        <span class="brand-name">AQUA<span class="gradient-text">TWIN</span></span>
+                        <span class="brand-sub">Autonomous Marine Rover • Node #01</span>
+                    </div>
+                </div>
+                <div class="mission-mode-badge" id="mission-mode-badge">
+                    <span class="mode-dot"></span>
+                    <span id="rover-mode-text">ROVER PATROL MODE</span>
+                </div>
+            </div>
+
+            <div class="nav-center">
+                <!-- 3D Camera Preset View Controls -->
+                <div class="camera-controls">
+                    <button id="cam-overview" class="btn-cam active" title="Bird's Eye Lake Overview">
+                        <i class="fa-solid fa-globe"></i> Overview
+                    </button>
+                    <button id="cam-follow" class="btn-cam" title="Follow Rover Close-Up">
+                        <i class="fa-solid fa-ship"></i> Follow Rover
+                    </button>
+                    <button id="cam-surface" class="btn-cam" title="Water Surface Level">
+                        <i class="fa-solid fa-water"></i> Water Level
+                    </button>
+                </div>
+            </div>
+
+            <div class="nav-right">
+                <div class="status-chip" id="lora-status-chip">
+                    <i class="fa-solid fa-tower-broadcast"></i>
+                    <span>LoRa 868MHz <strong id="lora-rssi">-78 dBm</strong></span>
+                </div>
+                <div class="status-chip" id="ws-status-chip">
+                    <span class="ws-indicator live" id="ws-indicator-dot"></span>
+                    <span id="ws-status-text">LIVE STREAM</span>
+                </div>
+                <button id="btn-trigger-anomaly" class="btn-danger-pill" title="Inject Mock Contamination Event to Test Detection">
+                    <i class="fa-solid fa-vial-virus"></i> Simulate Spill
+                </button>
+            </div>
+        </header>
+
+        <!-- Main HUD Layout Grid -->
+        <main id="hud-layout">
+            <!-- Left Panel: Real-Time Gauges & Parameters -->
+            <section id="panel-gauges" class="hud-panel glass-panel slide-in-left">
+                <div class="panel-header">
+                    <div class="panel-title">
+                        <i class="fa-solid fa-chart-pie"></i>
+                        <h3>Water Quality Metrics</h3>
+                    </div>
+                    <span class="telemetry-ts" id="last-update-time">Just now</span>
+                </div>
+
+                <div class="gauges-grid">
+                    <!-- Gauge 1: pH -->
+                    <div class="metric-card" id="card-ph">
+                        <div class="metric-top">
+                            <span class="metric-label"><i class="fa-solid fa-flask"></i> Acidity (pH)</span>
+                            <span class="metric-status status-good" id="badge-ph">OPTIMAL</span>
+                        </div>
+                        <div class="metric-body">
+                            <div class="metric-value-container">
+                                <span class="metric-num" id="val-ph">7.34</span>
+                                <span class="metric-unit">pH</span>
+                            </div>
+                            <div class="metric-bar-wrap">
+                                <div class="metric-bar" id="bar-ph" style="width: 52%;"></div>
+                            </div>
+                            <div class="metric-scale-limits">
+                                <span>0 Acid</span>
+                                <span class="safe-zone">6.5 - 8.5 Safe</span>
+                                <span>14 Base</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Gauge 2: Turbidity -->
+                    <div class="metric-card" id="card-turb">
+                        <div class="metric-top">
+                            <span class="metric-label"><i class="fa-solid fa-smog"></i> Turbidity</span>
+                            <span class="metric-status status-good" id="badge-turb">CLEAR</span>
+                        </div>
+                        <div class="metric-body">
+                            <div class="metric-value-container">
+                                <span class="metric-num" id="val-turb">6.5</span>
+                                <span class="metric-unit">NTU</span>
+                            </div>
+                            <div class="metric-bar-wrap">
+                                <div class="metric-bar warning-bar" id="bar-turb" style="width: 13%;"></div>
+                            </div>
+                            <div class="metric-scale-limits">
+                                <span>0 Crystal</span>
+                                <span class="safe-zone">&lt; 25 Normal</span>
+                                <span>&gt; 50 Turbid</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Gauge 3: Dissolved Oxygen -->
+                    <div class="metric-card" id="card-do">
+                        <div class="metric-top">
+                            <span class="metric-label"><i class="fa-solid fa-wind"></i> Dissolved O₂</span>
+                            <span class="metric-status status-good" id="badge-do">HEALTHY</span>
+                        </div>
+                        <div class="metric-body">
+                            <div class="metric-value-container">
+                                <span class="metric-num" id="val-do">8.42</span>
+                                <span class="metric-unit">mg/L</span>
+                            </div>
+                            <div class="metric-bar-wrap">
+                                <div class="metric-bar" id="bar-do" style="width: 70%;"></div>
+                            </div>
+                            <div class="metric-scale-limits">
+                                <span>&lt; 4 Hypoxic</span>
+                                <span class="safe-zone">&gt; 7 Oxygenated</span>
+                                <span>14 Sat</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Gauge 4: Water Temperature -->
+                    <div class="metric-card" id="card-temp">
+                        <div class="metric-top">
+                            <span class="metric-label"><i class="fa-solid fa-temperature-half"></i> Water Temp</span>
+                            <span class="metric-status status-good" id="badge-temp">NORMAL</span>
+                        </div>
+                        <div class="metric-body">
+                            <div class="metric-value-container">
+                                <span class="metric-num" id="val-temp">19.4</span>
+                                <span class="metric-unit">°C</span>
+                            </div>
+                            <div class="metric-bar-wrap">
+                                <div class="metric-bar" id="bar-temp" style="width: 48%;"></div>
+                            </div>
+                            <div class="metric-scale-limits">
+                                <span>0 °C</span>
+                                <span class="safe-zone">15 - 24 °C Ambient</span>
+                                <span>40 °C</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Power & Energy Management Sub-panel -->
+                <div class="power-summary">
+                    <div class="power-item">
+                        <div class="power-icon-wrap battery">
+                            <i class="fa-solid fa-battery-three-quarters" id="icon-battery"></i>
+                        </div>
+                        <div class="power-info">
+                            <span class="power-label">LiPo Battery</span>
+                            <span class="power-val"><strong id="val-battery-pct">82</strong>% (<span id="val-battery-mv">3940</span> mV)</span>
+                        </div>
+                    </div>
+                    <div class="power-item">
+                        <div class="power-icon-wrap solar">
+                            <i class="fa-solid fa-sun" id="icon-solar"></i>
+                        </div>
+                        <div class="power-info">
+                            <span class="power-label">Solar MPPT</span>
+                            <span class="power-val"><strong id="val-solar-pct">75</strong>% Generation</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Bottom Floating Drawer: Time-Series Graphs & EKF Innovation -->
+            <section id="panel-charts" class="hud-panel glass-panel slide-in-bottom">
+                <div class="panel-header">
+                    <div class="panel-title">
+                        <i class="fa-solid fa-wave-square"></i>
+                        <h3>Telemetry Trends & EKF State Estimation</h3>
+                    </div>
+                    <div class="chart-tab-controls">
+                        <button class="btn-chart-tab active" data-metric="all">Multi-Parameter</button>
+                        <button class="btn-chart-tab" data-metric="ph">pH</button>
+                        <button class="btn-chart-tab" data-metric="turbidity">Turbidity</button>
+                        <button class="btn-chart-tab" data-metric="do">Dissolved O₂</button>
+                        <button class="btn-chart-tab" data-metric="nis">EKF NIS</button>
+                    </div>
+                </div>
+
+                <div class="chart-wrapper">
+                    <canvas id="telemetryChart"></canvas>
+                </div>
+            </section>
+
+            <!-- Right Panel: GPS Navigation, Anomaly Feed & Digital Twin Inspector -->
+            <section id="panel-inspector" class="hud-panel glass-panel slide-in-right">
+                <!-- Anomaly Intelligence Card -->
+                <div class="inspector-card ekf-card">
+                    <div class="card-header">
+                        <h4><i class="fa-solid fa-brain"></i> EKF Anomaly Core</h4>
+                        <span class="nis-badge" id="nis-badge">NIS: 1.18</span>
+                    </div>
+                    <p class="ekf-desc">Extended Kalman Filter tracking 4 continuous states with Chi-Square statistical validation.</p>
+                    <div class="nis-meter-container">
+                        <div class="nis-meter-bar" id="nis-meter-bar" style="width: 12%;"></div>
+                        <div class="nis-threshold-marker" title="Threshold: 13.28 (99% confidence)"></div>
+                    </div>
+                    <div class="nis-labels">
+                        <span>0.0 Nominal</span>
+                        <span class="threshold-label">Threshold: 13.28</span>
+                        <span>25.0 Critical</span>
+                    </div>
+                </div>
+
+                <!-- GPS Location & Patrol Waypoints -->
+                <div class="inspector-card">
+                    <div class="card-header">
+                        <h4><i class="fa-solid fa-location-crosshairs"></i> Waypoint Navigation</h4>
+                        <span class="gps-coords" id="gps-coords-display">51.5074° N, 0.1278° W</span>
+                    </div>
+                    <div class="waypoint-list" id="waypoint-list">
+                        <!-- Rendered dynamically by data-overlay.js -->
+                    </div>
+                </div>
+
+                <!-- Contamination Event Feed -->
+                <div class="inspector-card alerts-feed-card">
+                    <div class="card-header">
+                        <h4><i class="fa-solid fa-shield-virus"></i> Anomaly Log</h4>
+                        <span class="alert-count-pill" id="alert-count-pill">0 Events</span>
+                    </div>
+                    <div class="alert-history" id="alert-history">
+                        <div class="empty-alerts">
+                            <i class="fa-solid fa-circle-check"></i>
+                            <span>Water body stable. No active contamination alarms.</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Scripts -->
+    <script src="js/water.js"></script>
+    <script src="js/websocket.js"></script>
+    <script src="js/data-overlay.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>

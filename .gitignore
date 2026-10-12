@@ -1,0 +1,58 @@
+# Build artifacts
+firmware/build/
+firmware/.pio/
+firmware/.vscode/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.eggs/
+dist/
+build/
+*.egg
+.venv/
+venv/
+env/
+
+# IDE
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Docker volumes
+influxdb-data/
+grafana-data/
+
+# Node modules (dashboard)
+dashboard/node_modules/
+
+# Compiled firmware binaries
+*.bin
+*.hex
+*.elf
+*.map
+
+# Logs
+*.log
+
+# OS
+desktop.ini
+ehthumbs.db
+
+# Database & test cache
+data/
+*.db
+.pytest_cache/
+
+# Plan file (not part of the project)
+plan-05-water-quality.md

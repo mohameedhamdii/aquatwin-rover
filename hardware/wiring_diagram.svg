@@ -1,0 +1,105 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 700" width="100%" height="100%" style="background:#091322; font-family:'Segoe UI', Roboto, sans-serif;">
+  <defs>
+    <linearGradient id="mcuGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#1e3a8a"/>
+      <stop offset="100%" stop-color="#0f172a"/>
+    </linearGradient>
+    <linearGradient id="sensorGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#065f46"/>
+      <stop offset="100%" stop-color="#064e3b"/>
+    </linearGradient>
+    <linearGradient id="rfGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#701a75"/>
+      <stop offset="100%" stop-color="#4a044e"/>
+    </linearGradient>
+    <linearGradient id="pwrGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#b45309"/>
+      <stop offset="100%" stop-color="#78350f"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="3" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+
+  <!-- Title -->
+  <text x="550" y="45" fill="#38bdf8" font-size="24" font-weight="bold" text-anchor="middle" letter-spacing="1.5">AquaTwin System Interconnect &amp; Wiring Diagram</text>
+  <text x="550" y="70" fill="#94a3b8" font-size="13" text-anchor="middle">STM32L476RG Nucleo-64 Pin Mapping for Autonomous Water-Quality Rover / Buoy</text>
+
+  <!-- Central MCU Block -->
+  <rect x="420" y="120" width="260" height="460" rx="16" fill="url(#mcuGrad)" stroke="#38bdf8" stroke-width="2.5" />
+  <text x="550" y="160" fill="#f8fafc" font-size="18" font-weight="bold" text-anchor="middle">STM32L476RG</text>
+  <text x="550" y="180" fill="#38bdf8" font-size="12" text-anchor="middle">ARM Cortex-M4 @ 80MHz</text>
+
+  <!-- Left Side: Analog & OneWire Sensors -->
+  <!-- pH Sensor -->
+  <g transform="translate(60, 130)">
+    <rect width="260" height="75" rx="10" fill="url(#sensorGrad)" stroke="#34d399" stroke-width="1.5"/>
+    <text x="20" y="32" fill="#fff" font-weight="bold" font-size="14">pH Sensor V2 (SEN0161)</text>
+    <text x="20" y="52" fill="#a7f3d0" font-size="11">Analog Out ──▶ PA0 (ADC1_IN5)</text>
+    <path d="M 260 37 L 420 220" stroke="#34d399" stroke-width="2" fill="none" stroke-dasharray="4,2"/>
+  </g>
+
+  <!-- Turbidity Sensor -->
+  <g transform="translate(60, 230)">
+    <rect width="260" height="75" rx="10" fill="url(#sensorGrad)" stroke="#34d399" stroke-width="1.5"/>
+    <text x="20" y="32" fill="#fff" font-weight="bold" font-size="14">Turbidity Sensor (SEN0189)</text>
+    <text x="20" y="52" fill="#a7f3d0" font-size="11">Analog Out ──▶ PA1 (ADC1_IN6)</text>
+    <path d="M 260 37 L 420 260" stroke="#34d399" stroke-width="2" fill="none" stroke-dasharray="4,2"/>
+  </g>
+
+  <!-- DO Sensor -->
+  <g transform="translate(60, 330)">
+    <rect width="260" height="75" rx="10" fill="url(#sensorGrad)" stroke="#34d399" stroke-width="1.5"/>
+    <text x="20" y="32" fill="#fff" font-weight="bold" font-size="14">DO Sensor (SEN0237-A)</text>
+    <text x="20" y="52" fill="#a7f3d0" font-size="11">Analog Out ──▶ PA4 (ADC1_IN9)</text>
+    <path d="M 260 37 L 420 300" stroke="#34d399" stroke-width="2" fill="none" stroke-dasharray="4,2"/>
+  </g>
+
+  <!-- Temp Sensor -->
+  <g transform="translate(60, 430)">
+    <rect width="260" height="75" rx="10" fill="url(#sensorGrad)" stroke="#34d399" stroke-width="1.5"/>
+    <text x="20" y="32" fill="#fff" font-weight="bold" font-size="14">DS18B20 Temp Probe</text>
+    <text x="20" y="52" fill="#a7f3d0" font-size="11">OneWire Data ──▶ PB0 (+4.7k Pull-up)</text>
+    <path d="M 260 37 L 420 340" stroke="#34d399" stroke-width="2" fill="none" stroke-dasharray="4,2"/>
+  </g>
+
+  <!-- Right Side: Communications & Navigation -->
+  <!-- SX1276 LoRa -->
+  <g transform="translate(780, 130)">
+    <rect width="260" height="110" rx="10" fill="url(#rfGrad)" stroke="#f472b6" stroke-width="1.5"/>
+    <text x="20" y="30" fill="#fff" font-weight="bold" font-size="14">SX1276 / RFM95W LoRa</text>
+    <text x="20" y="50" fill="#fbcfe8" font-size="11">SPI1: SCK(PA5), MISO(PA6), MOSI(PA7)</text>
+    <text x="20" y="70" fill="#fbcfe8" font-size="11">CS ──▶ PB6  |  RST ──▶ PC7</text>
+    <text x="20" y="90" fill="#fbcfe8" font-size="11">DIO0 (IRQ) ──▶ PB4 (EXTI)</text>
+    <path d="M 0 55 L -100 0 L -100 80" transform="translate(780, 130)" stroke="#f472b6" stroke-width="2" fill="none"/>
+  </g>
+
+  <!-- u-blox GPS -->
+  <g transform="translate(780, 270)">
+    <rect width="260" height="75" rx="10" fill="url(#rfGrad)" stroke="#f472b6" stroke-width="1.5"/>
+    <text x="20" y="32" fill="#fff" font-weight="bold" font-size="14">u-blox NEO-M8N GPS</text>
+    <text x="20" y="52" fill="#fbcfe8" font-size="11">TX ──▶ PA3 (USART2_RX) 9600bd</text>
+    <path d="M 780 307 L 680 380" stroke="#f472b6" stroke-width="2" fill="none"/>
+  </g>
+
+  <!-- DRV8833 Thruster Driver -->
+  <g transform="translate(780, 370)">
+    <rect width="260" height="90" rx="10" fill="#1e293b" stroke="#94a3b8" stroke-width="1.5"/>
+    <text x="20" y="30" fill="#fff" font-weight="bold" font-size="14">DRV8833 Dual Thruster</text>
+    <text x="20" y="50" fill="#cbd5e1" font-size="11">Left PWM ──▶ PB8 (TIM4_CH3)</text>
+    <text x="20" y="70" fill="#cbd5e1" font-size="11">Right PWM ──▶ PB9 (TIM4_CH4)</text>
+    <path d="M 780 415 L 680 430" stroke="#94a3b8" stroke-width="2" fill="none"/>
+  </g>
+
+  <!-- Bottom: Power & Battery Management -->
+  <g transform="translate(240, 560)">
+    <rect width="620" height="100" rx="12" fill="url(#pwrGrad)" stroke="#fbbf24" stroke-width="1.5"/>
+    <text x="310" y="30" fill="#fff" font-weight="bold" font-size="15" text-anchor="middle">DFR0559 Solar MPPT &amp; 3.7V 6000mAh LiPo Power Subsystem</text>
+    <text x="40" y="60" fill="#fef3c7" font-size="12">• 6V/3W Solar Panel ──▶ MPPT Charge Controller</text>
+    <text x="40" y="80" fill="#fef3c7" font-size="12">• Battery Sense: PC0 (1:2 divider) | Solar Sense: PC1 (1:3 divider)</text>
+    <text x="420" y="60" fill="#fef3c7" font-size="12">• 3.3V / 5.0V Buck-Boost Rail</text>
+    <text x="420" y="80" fill="#fef3c7" font-size="12">• STM32 STOP2 Deep Sleep Mode (~2µA)</text>
+  </g>
+
+</svg>

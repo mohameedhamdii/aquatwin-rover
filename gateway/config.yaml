@@ -1,0 +1,20 @@
+gateway:
+  id: "GW-WATER-01"
+  mode: "serial" # options: "serial", "spi", "demo_loop"
+  serial_port: "COM3" # Linux: "/dev/ttyUSB0", Windows: "COM3"
+  baudrate: 115200
+  timeout_seconds: 2
+
+backend:
+  url: "http://localhost:8000/api/v1/packet/raw"
+  health_url: "http://localhost:8000/api/v1/status"
+  timeout_seconds: 5
+  retry_backoff_seconds: 3
+
+lora:
+  frequency_mhz: 868.1
+  bandwidth_khz: 125
+  spreading_factor: 10
+  coding_rate: "4/5"
+  sync_word: 0x12
+  preamble_length: 8
