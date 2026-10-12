@@ -24,7 +24,9 @@ class WaterSurface {
                 uWaterColor: { value: new THREE.Color(0x06395b) },
                 uWaterDeep: { value: new THREE.Color(0x021626) },
                 uFoamColor: { value: new THREE.Color(0x73d2ff) },
-                uLightPosition: { value: new THREE.Vector3(40, 60, 40) }
+                uLightPosition: { value: new THREE.Vector3(40, 60, 40) },
+                uFogColor: { value: new THREE.Color(0x07111e) },   // matches scene.fog
+                uFogDensity: { value: 0.012 }
             },
             vertexShader: `
                 uniform float uTime;
@@ -51,7 +53,7 @@ class WaterSurface {
                     float waveX = getWave(pos.xz + vec2(delta, 0.0), uTime);
                     float waveZ = getWave(pos.xz + vec2(0.0, delta), uTime);
                     vec3 norm = normalize(vec3(wave - waveX, delta, wave - waveZ));
-                    vNormal = normalMatrix * norm;
+                    vNormal = normalize(mat3(modelMatrix) * norm); // world space, same as light/view vectors
 
                     vec4 worldPos = modelMatrix * vec4(pos, 1.0);
                     vWorldPosition = worldPos.xyz;
@@ -63,6 +65,8 @@ class WaterSurface {
                 uniform vec3 uWaterDeep;
                 uniform vec3 uFoamColor;
                 uniform vec3 uLightPosition;
+                uniform vec3 uFogColor;
+                uniform float uFogDensity;
                 varying vec3 vWorldPosition;
                 varying vec3 vNormal;
                 varying float vWaveHeight;
@@ -86,7 +90,11 @@ class WaterSurface {
                     vec3 baseCol = mix(uWaterDeep, uWaterColor, clamp(vWaveHeight + 0.5, 0.0, 1.0));
                     baseCol = mix(baseCol, uFoamColor, fresnel * 0.4 + spec * 0.6);
 
-                    gl_FragColor = vec4(baseCol + vec3(spec * 0.7), 0.88);
+                    // ShaderMaterial ignores scene.fog, so blend it in manually (matches FogExp2)
+                    float fogDist = length(cameraPosition - vWorldPosition);
+                    float fogAmt = 1.0 - exp(-pow(uFogDensity * fogDist, 2.0));
+                    vec3 col = mix(baseCol + vec3(spec * 0.7), uFogColor, fogAmt);
+                    gl_FragColor = vec4(col, 0.88);
                 }
             `,
             transparent: true,
@@ -96,7 +104,6 @@ class WaterSurface {
         this.material = customMaterial;
         this.mesh = new THREE.Mesh(geometry, customMaterial);
         this.mesh.position.y = 0;
-        this.mesh.receiveShadow = true;
         this.scene.add(this.mesh);
     }
 

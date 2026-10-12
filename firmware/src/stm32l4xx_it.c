@@ -15,7 +15,7 @@ extern RTC_HandleTypeDef g_hrtc;
 
 #ifdef BUILD_MODE_ROVER
 extern gps_driver_t g_gps;
-static uint8_t gps_rx_byte;
+uint8_t g_gps_rx_byte;
 #endif
 
 /* ============================================================================
@@ -74,22 +74,17 @@ void EXTI9_5_IRQHandler(void)
 void USART2_IRQHandler(void)
 {
     HAL_UART_IRQHandler(&g_huart_gps);
-
-#ifdef BUILD_MODE_ROVER
-    /* Re-arm single byte receive */
-    HAL_UART_Receive_IT(&g_huart_gps, &gps_rx_byte, 1);
-#endif
 }
 
 #ifdef BUILD_MODE_ROVER
 /**
- * @brief UART RX complete callback — feed GPS parser
+ * @brief UART RX complete callback — feed GPS parser and re-arm
  */
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
     if (huart->Instance == USART2) {
-        gps_uart_rx_callback(&g_gps, gps_rx_byte);
-        HAL_UART_Receive_IT(&g_huart_gps, &gps_rx_byte, 1);
+        gps_uart_rx_callback(&g_gps, g_gps_rx_byte);
+        HAL_UART_Receive_IT(&g_huart_gps, &g_gps_rx_byte, 1);
     }
 }
 #endif

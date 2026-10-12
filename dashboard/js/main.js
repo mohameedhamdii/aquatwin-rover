@@ -3,8 +3,24 @@
  * @brief 3D Digital Twin Engine with Three.js — Water Shader, Shoreline, Rover Model & Real-Time Sync
  */
 
+// Shared geo/world constants so the mock-spill and telemetry mapping can't drift apart
+const GEO_ORIGIN = { lat: 51.5074, lon: -0.1278 };
+const UNITS_PER_DEGREE = 12000.0;
+const LAKE_RADIUS = 38;
+
+// One terrain height function used by both the mesh and the trees standing on it
+function terrainHeight(x, z) {
+    const dist = Math.hypot(x, z);
+    const e = Math.pow(Math.max(0, dist - 48) * 0.18, 1.3) + Math.sin(x * 0.1) * Math.cos(z * 0.1) * 2.5;
+    return Math.max(0.2, e);
+}
+
 class DigitalTwinApp {
     constructor() {
+        if (typeof THREE === 'undefined') {
+            console.error('[AquaTwin 3D] Three.js library not loaded.');
+            return;
+        }
         this.container = document.getElementById('app-container');
         this.canvas = document.getElementById('webgl-canvas');
         this.scene = null;
@@ -20,7 +36,9 @@ class DigitalTwinApp {
         this.cameraMode = 'overview'; // 'overview', 'follow', 'surface'
         this.roverTargetPos = new THREE.Vector3(0, 0, 0);
         this.roverCurrentPos = new THREE.Vector3(0, 0, 0);
-        this.roverHeading = 0;
+        this.lastRoverPos = new THREE.Vector3();
+        this.flyTo = null;
+        this.elapsed = 0;
 
         this.overlayManager = null;
         this.wsClient = null;
@@ -69,6 +87,7 @@ class DigitalTwinApp {
         this.controls.minDistance = 6;
         this.controls.maxDistance = 140;
         this.controls.target.set(0, 0, 0);
+        this.controls.addEventListener('start', () => { this.flyTo = null; }); // user input cancels camera transitions
 
         // Lighting
         const ambientLight = new THREE.AmbientLight(0x4070a0, 0.9);
@@ -107,11 +126,7 @@ class DigitalTwinApp {
         for (let i = 0; i < pos.count; i++) {
             const x = pos.getX(i);
             const z = pos.getZ(i);
-            const dist = Math.sqrt(x * x + z * z);
-            if (dist > 48) {
-                const elevation = Math.pow((dist - 48) * 0.18, 1.3) + Math.sin(x * 0.1) * Math.cos(z * 0.1) * 2.5;
-                pos.setY(i, Math.max(0.2, elevation));
-            }
+            pos.setY(i, terrainHeight(x, z));
         }
         terrainGeo.computeVertexNormals();
 
@@ -142,7 +157,7 @@ class DigitalTwinApp {
             const radius = 55 + Math.random() * 25;
             const x = Math.cos(angle) * radius;
             const z = Math.sin(angle) * radius;
-            const y = Math.pow((radius - 48) * 0.18, 1.3) + 1.0;
+            const y = terrainHeight(x, z) - 0.1; // plant the trunk base slightly into the ground
 
             const tree = new THREE.Group();
             const trunk = new THREE.Mesh(trunkGeo, trunkMat);
@@ -165,6 +180,7 @@ class DigitalTwinApp {
     buildRoverModel() {
         // High-detail procedural autonomous catamaran rover
         this.rover = new THREE.Group();
+        this.rover.rotation.order = 'YXZ'; // heading first, so pitch/roll stay in the hull's own frame
 
         // 1. Twin Catamaran Pontoon Hulls
         const hullGeo = new THREE.BoxGeometry(0.8, 0.7, 4.2);
@@ -260,10 +276,13 @@ class DigitalTwinApp {
             [btnOverview, btnFollow, btnSurface].forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
 
-            if (mode === 'overview') {
-                this.controls.target.set(0, 0, 0);
-                this.camera.position.set(0, 36, 52);
-            }
+            // Smooth fly-to; follow modes then ride along with the rover while staying orbitable
+            const presets = {
+                overview: { follow: false, offset: new THREE.Vector3(0, 36, 52) },
+                follow:   { follow: true,  offset: new THREE.Vector3(0, 7, 14) },
+                surface:  { follow: true,  offset: new THREE.Vector3(-8, 2, 8) }
+            };
+            this.flyTo = presets[mode];
         };
 
         if (btnOverview) btnOverview.addEventListener('click', () => setCam('overview', btnOverview));
@@ -276,49 +295,30 @@ class DigitalTwinApp {
 
         this.wsClient = new window.TelemetryWebSocket(
             (reading) => this.onTelemetryReceived(reading),
-            (isOnline, statusText) => {
+            (mode, statusText) => {
                 const dot = document.getElementById('ws-indicator-dot');
                 const text = document.getElementById('ws-status-text');
-                if (dot) dot.className = `ws-indicator ${isOnline ? 'live' : 'offline'}`;
+                if (dot) dot.className = `ws-indicator ${mode}`;
                 if (text) text.textContent = statusText;
             }
         );
 
-        // Listen for mock spill demo event
-        window.addEventListener('aqua:mockSpill', () => {
-            const mockSpillReading = {
-                timestamp: Math.floor(Date.now() / 1000),
-                device_id: 1,
-                latitude: this.roverCurrentPos.x * 0.0001 + 51.5074,
-                longitude: this.roverCurrentPos.z * 0.0001 - 0.1278,
-                ph: 4.85,
-                turbidity: 78.4,
-                do_mg_l: 2.30,
-                temp_c: 27.8,
-                battery_mv: 3820,
-                battery_pct: 65.0,
-                solar_power_pct: 55,
-                anomaly_flags: 0x1F,
-                ekf_nis: 17.8,
-                is_anomaly: true,
-                anomaly_types: ["Severe Acidic Spike (pH 4.85)", "Industrial Effluent Plume (78.4 NTU)", "Severe Hypoxia (2.30 mg/L)"]
-            };
-            this.onTelemetryReceived(mockSpillReading);
-        });
+        // Used when the backend has no spill endpoint: inject a spill into the local generator
+        window.addEventListener('aqua:mockSpill', () => this.wsClient.injectSpill());
     }
 
     onTelemetryReceived(reading) {
         // 1. Update HUD components & charts
         this.overlayManager.updateTelemetryUI(reading);
 
-        // 2. Map GPS coordinates to 3D world space coordinates
-        // Reference origin: (51.5074, -0.1278) -> (0, 0) in 3D
-        const dLat = (reading.latitude - 51.5074) * 12000.0;
-        const dLon = (reading.longitude - (-0.1278)) * 12000.0;
-
-        // Constrain rover inside lake boundaries
-        this.roverTargetPos.x = Math.max(-36, Math.min(36, dLon));
-        this.roverTargetPos.z = Math.max(-36, Math.min(36, -dLat));
+        // 2. Map GPS coordinates to 3D world space: north = -Z, east = +X
+        if (Number.isFinite(reading.latitude) && Number.isFinite(reading.longitude)) {
+            const x = (reading.longitude - GEO_ORIGIN.lon) * UNITS_PER_DEGREE;
+            const z = -(reading.latitude - GEO_ORIGIN.lat) * UNITS_PER_DEGREE;
+            const r = Math.hypot(x, z);
+            const k = r > LAKE_RADIUS ? LAKE_RADIUS / r : 1; // keep the rover inside the circular lake
+            this.roverTargetPos.set(x * k, 0, z * k);
+        }
 
         // 3. Update status beacon color based on anomaly state
         if (this.roverBeacon && this.roverLight) {
@@ -344,49 +344,50 @@ class DigitalTwinApp {
     animate() {
         requestAnimationFrame(() => this.animate());
 
-        const elapsedTime = this.clock.getElapsedTime();
+        // Single clock read per frame (getElapsedTime + getDelta would corrupt each other)
+        const dt = Math.min(this.clock.getDelta(), 0.1);
+        this.elapsed += dt;
+        const elapsedTime = this.elapsed;
 
-        // 1. Update water wave shader
-        if (this.water) {
-            this.water.update(elapsedTime);
-        }
+        if (this.water) this.water.update(elapsedTime);
 
-        // 2. Interpolate rover motion towards target coordinates
         if (this.rover) {
-            this.roverCurrentPos.lerp(this.roverTargetPos, 0.035);
+            // Frame-rate independent smoothing
+            this.roverCurrentPos.lerp(this.roverTargetPos, 1 - Math.exp(-2.2 * dt));
 
-            // Calculate wave height & bobbing at rover's current water coordinates
             const waveY = this.water ? this.water.getWaterHeightAt(this.roverCurrentPos.x, this.roverCurrentPos.z, elapsedTime) : 0;
             this.rover.position.set(this.roverCurrentPos.x, waveY + 0.15, this.roverCurrentPos.z);
 
-            // Gentle wave pitch & roll simulation
             this.rover.rotation.x = Math.sin(elapsedTime * 2.5) * 0.04;
             this.rover.rotation.z = Math.cos(elapsedTime * 2.0) * 0.05;
 
-            // Turn rover heading in movement direction
+            // Turn toward travel direction via the shortest arc (no spinning the long way round)
             const dx = this.roverTargetPos.x - this.roverCurrentPos.x;
             const dz = this.roverTargetPos.z - this.roverCurrentPos.z;
-            if (Math.sqrt(dx * dx + dz * dz) > 0.05) {
-                const targetHeading = Math.atan2(dx, dz);
-                this.rover.rotation.y = THREE.MathUtils.lerp(this.rover.rotation.y, targetHeading, 0.05);
+            if (Math.hypot(dx, dz) > 0.05) {
+                const err = Math.atan2(dx, dz) - this.rover.rotation.y;
+                this.rover.rotation.y += Math.atan2(Math.sin(err), Math.cos(err)) * (1 - Math.exp(-3 * dt));
             }
 
-            // Beacon flash animation
             if (this.roverLight) {
                 this.roverLight.intensity = 1.8 + Math.sin(elapsedTime * 6.0) * 0.8;
             }
+
+            // Follow modes: move camera + target by the rover's motion so the user can still orbit/zoom
+            if (this.cameraMode !== 'overview') {
+                const delta = this.roverCurrentPos.clone().sub(this.lastRoverPos);
+                this.camera.position.add(delta);
+                this.controls.target.add(delta);
+            }
+            this.lastRoverPos.copy(this.roverCurrentPos);
         }
 
-        // 3. Camera modes handling
-        if (this.cameraMode === 'follow' && this.rover) {
-            const offset = new THREE.Vector3(0, 7, 14);
-            const targetCamPos = this.rover.position.clone().add(offset);
-            this.camera.position.lerp(targetCamPos, 0.05);
-            this.controls.target.lerp(this.rover.position, 0.08);
-        } else if (this.cameraMode === 'surface' && this.rover) {
-            const surfacePos = new THREE.Vector3(this.rover.position.x - 8, 2.0, this.rover.position.z + 8);
-            this.camera.position.lerp(surfacePos, 0.05);
-            this.controls.target.lerp(this.rover.position, 0.08);
+        if (this.flyTo) {
+            const base = this.flyTo.follow ? this.roverCurrentPos : new THREE.Vector3();
+            const goal = base.clone().add(this.flyTo.offset);
+            this.camera.position.lerp(goal, 1 - Math.exp(-4 * dt));
+            this.controls.target.lerp(base, 1 - Math.exp(-5 * dt));
+            if (this.camera.position.distanceTo(goal) < 0.2) this.flyTo = null;
         }
 
         this.controls.update();

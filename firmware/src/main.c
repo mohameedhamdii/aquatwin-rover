@@ -473,8 +473,8 @@ int main(void)
     waypoint_nav_add_waypoint(&g_nav, 515002000, -1278000);
 
     /* Start GPS UART interrupt reception */
-    static uint8_t gps_rx_byte;
-    HAL_UART_Receive_IT(&g_huart_gps, &gps_rx_byte, 1);
+    extern uint8_t g_gps_rx_byte;
+    HAL_UART_Receive_IT(&g_huart_gps, &g_gps_rx_byte, 1);
 
     waypoint_nav_start(&g_nav);
 #endif

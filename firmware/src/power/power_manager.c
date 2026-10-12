@@ -61,6 +61,9 @@ power_mode_t power_manager_get_mode(const power_manager_t *pm)
     return pm->mode;
 }
 
+/* External RTC handle defined in main.c */
+extern RTC_HandleTypeDef g_hrtc;
+
 /**
  * @brief Enter STM32L4 STOP2 mode and wake via RTC alarm
  *
@@ -72,9 +75,8 @@ void power_manager_enter_stop_mode(uint32_t seconds)
     if (seconds == 0) return;
 
     /* Configure RTC wake-up timer */
-    HAL_RTCEx_SetWakeUpTimer_IT(&hrtc_placeholder, seconds - 1,
+    HAL_RTCEx_SetWakeUpTimer_IT(&g_hrtc, seconds - 1,
                                  RTC_WAKEUPCLOCK_CK_SPRE_16BITS);
-    /* Note: hrtc must be declared globally in main.c */
 
     /* Suspend SysTick to prevent wake-up */
     HAL_SuspendTick();
@@ -92,7 +94,7 @@ void power_manager_enter_stop_mode(uint32_t seconds)
     HAL_ResumeTick();
 
     /* Disable RTC wake-up */
-    HAL_RTCEx_DeactivateWakeUpTimer(&hrtc_placeholder);
+    HAL_RTCEx_DeactivateWakeUpTimer(&g_hrtc);
 }
 
 /**
@@ -110,6 +112,3 @@ void power_manager_enter_deep_sleep(void)
     /* Enter standby mode — all RAM lost, MCU resets on wake */
     HAL_PWR_EnterSTANDBYMode();
 }
-
-/* Placeholder RTC handle — must be defined in main.c */
-__attribute__((weak)) RTC_HandleTypeDef hrtc_placeholder;

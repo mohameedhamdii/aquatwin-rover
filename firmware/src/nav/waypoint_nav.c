@@ -149,8 +149,8 @@ void waypoint_nav_update(waypoint_nav_t *nav)
                 return;
             }
         }
-        nav->state = NAV_STATE_ARRIVED;
-        return;
+        /* Point towards next waypoint */
+        target = &nav->waypoints[nav->current_wp];
     }
 
     /* Compute desired bearing */

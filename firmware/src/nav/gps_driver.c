@@ -126,11 +126,21 @@ static void parse_rmc(gps_driver_t *gps, const char *sentence)
 {
     const char *time_field   = nmea_get_field(sentence, 1);
     const char *status       = nmea_get_field(sentence, 2);
+    const char *lat_field    = nmea_get_field(sentence, 3);
+    const char *lat_dir      = nmea_get_field(sentence, 4);
+    const char *lon_field    = nmea_get_field(sentence, 5);
+    const char *lon_dir      = nmea_get_field(sentence, 6);
     const char *speed_field  = nmea_get_field(sentence, 7);
     const char *course_field = nmea_get_field(sentence, 8);
 
     if (status && *status == 'A') {
+        gps->fix.fix_valid = 1;
         gps->fix.timestamp = nmea_parse_time(time_field);
+
+        if (lat_field && lon_field) {
+            gps->fix.latitude  = nmea_parse_coord(lat_field, lat_dir);
+            gps->fix.longitude = nmea_parse_coord(lon_field, lon_dir);
+        }
 
         if (speed_field && *speed_field != ',') {
             gps->speed_knots = (float)atof(speed_field);

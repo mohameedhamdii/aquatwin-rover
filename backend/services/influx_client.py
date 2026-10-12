@@ -17,12 +17,16 @@ class InfluxStorageClient:
     def __init__(self, config: Dict[str, Any]):
         self.config = config
         self.db_config = config.get("database", {})
-        self.influx_url = self.db_config.get("influxdb_url", "http://influxdb:8086")
-        self.token = self.db_config.get("token", "")
-        self.org = self.db_config.get("org", "water_quality_org")
-        self.bucket = self.db_config.get("bucket", "water_quality_data")
-        self.fallback_active = self.db_config.get("enable_fallback_storage", True)
-        self.fallback_path = self.db_config.get("fallback_db_path", "data/telemetry_fallback.db")
+        self.influx_url = os.environ.get("INFLUXDB_URL", self.db_config.get("influxdb_url", "http://influxdb:8086"))
+        self.token = os.environ.get("INFLUXDB_TOKEN", self.db_config.get("token", ""))
+        self.org = os.environ.get("INFLUXDB_ORG", self.db_config.get("org", "water_quality_org"))
+        self.bucket = os.environ.get("INFLUXDB_BUCKET", self.db_config.get("bucket", "water_quality_data"))
+        raw_path = self.db_config.get("fallback_db_path", "data/telemetry_fallback.db")
+        if not os.path.isabs(raw_path):
+            repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+            self.fallback_path = os.path.join(repo_root, raw_path)
+        else:
+            self.fallback_path = raw_path
 
         self.client = None
         self.write_api = None
@@ -87,14 +91,13 @@ class InfluxStorageClient:
             from influxdb_client import InfluxDBClient
             from influxdb_client.client.write_api import SYNCHRONOUS
             self.client = InfluxDBClient(url=self.influx_url, token=self.token, org=self.org, timeout=3000)
-            health = self.client.health()
-            if health.status == "pass":
+            if self.client.ping():
                 self.write_api = self.client.write_api(write_options=SYNCHRONOUS)
                 self.query_api = self.client.query_api()
                 self.connected_to_influx = True
                 logger.info(f"Connected successfully to InfluxDB at {self.influx_url}")
             else:
-                logger.info(f"InfluxDB reachable but health check returned: {health.status}. Using fallback storage.")
+                logger.info("InfluxDB not reachable via ping. Standalone SQLite fallback active.")
                 self.connected_to_influx = False
         except Exception as e:
             logger.info(f"InfluxDB not reachable ({e}). Standalone SQLite fallback active.")

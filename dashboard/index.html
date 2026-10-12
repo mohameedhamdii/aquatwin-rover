@@ -29,7 +29,7 @@
         <canvas id="webgl-canvas"></canvas>
 
         <!-- Anomaly Warning Banner (Appears when contamination is detected) -->
-        <div id="anomaly-banner" class="anomaly-banner hidden">
+        <div id="anomaly-banner" class="anomaly-banner hidden" role="alert">
             <div class="banner-content">
                 <i class="fa-solid fa-triangle-exclamation pulse-icon"></i>
                 <div class="banner-text">
@@ -37,7 +37,7 @@
                     <p id="banner-desc">Extended Kalman Filter Innovation (NIS: 16.4) exceeded safety threshold (13.28).</p>
                 </div>
             </div>
-            <button id="btn-dismiss-banner" class="btn-banner-action" title="Dismiss Banner">
+            <button id="btn-dismiss-banner" class="btn-banner-action" title="Dismiss Banner" aria-label="Dismiss contamination banner">
                 <i class="fa-solid fa-xmark"></i>
             </button>
         </div>
@@ -157,7 +157,7 @@
                                 <span class="metric-unit">mg/L</span>
                             </div>
                             <div class="metric-bar-wrap">
-                                <div class="metric-bar" id="bar-do" style="width: 70%;"></div>
+                                <div class="metric-bar" id="bar-do" style="width: 60%;"></div>
                             </div>
                             <div class="metric-scale-limits">
                                 <span>&lt; 4 Hypoxic</span>

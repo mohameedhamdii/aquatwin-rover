@@ -6,14 +6,9 @@
 class DataOverlayManager {
     constructor() {
         this.chart = null;
-        this.historyData = {
-            labels: [],
-            ph: [],
-            turbidity: [],
-            do: [],
-            temp: [],
-            nis: []
-        };
+        this.inAnomaly = false;
+        this.calmReadings = 0;
+        this.lastAnomalyKey = '';
         this.maxHistoryPoints = 30;
         this.activeMetricFilter = 'all';
         this.alertCount = 0;
@@ -46,19 +41,24 @@ class DataOverlayManager {
         const btnSpill = document.getElementById('btn-trigger-anomaly');
         if (btnSpill) {
             btnSpill.addEventListener('click', async () => {
+                // fetch() only rejects on network errors, so a 404/501 from a static server must be checked too
+                let ok = false;
                 try {
-                    await fetch('/api/v1/simulate/anomaly', { method: 'POST' });
-                } catch (e) {
-                    console.log('Dispatching client-side simulated spill');
-                    // Fallback to local dispatch
-                    window.dispatchEvent(new CustomEvent('aqua:mockSpill'));
-                }
+                    const res = await fetch('/api/v1/simulate/anomaly', { method: 'POST' });
+                    ok = res.ok;
+                } catch (e) { /* no backend */ }
+                if (!ok) window.dispatchEvent(new CustomEvent('aqua:mockSpill'));
             });
         }
     }
 
     initChart() {
-        const ctx = document.getElementById('telemetryChart').getContext('2d');
+        const canvas = document.getElementById('telemetryChart');
+        if (!canvas || typeof Chart === 'undefined') {
+            console.warn('[AquaTwin HUD] Chart.js or telemetryChart canvas unavailable.');
+            return;
+        }
+        const ctx = canvas.getContext('2d');
 
         this.chart = new Chart(ctx, {
             type: 'line',
@@ -173,106 +173,66 @@ class DataOverlayManager {
         this.chart.update('none');
     }
 
+    paintMetric(key, value, decimals, max, state) {
+        if (!Number.isFinite(value)) return;
+        const labels = {
+            ph:   { good: 'OPTIMAL', warn: 'CAUTION',  bad: 'ANOMALY' },
+            turb: { good: 'CLEAR',   warn: 'MODERATE', bad: 'HIGH TURBIDITY' },
+            do:   { good: 'HEALTHY', warn: 'LOW',      bad: 'HYPOXIC' },
+            temp: { good: 'NORMAL',  warn: 'WARM',     bad: 'HEATED' }
+        };
+        const num = document.getElementById(`val-${key}`);
+        const bar = document.getElementById(`bar-${key}`);
+        const badge = document.getElementById(`badge-${key}`);
+        const card = document.getElementById(`card-${key}`);
+        if (num) num.textContent = value.toFixed(decimals);
+        if (bar) bar.style.width = `${Math.min(100, Math.max(0, (value / max) * 100))}%`;
+        if (badge) {
+            badge.className = `metric-status status-${state}`;
+            badge.textContent = labels[key][state];
+        }
+        if (card) card.dataset.state = state; // drives bar colour in CSS
+    }
+
     updateTelemetryUI(reading) {
-        // 1. pH card
-        const valPh = document.getElementById('val-ph');
-        const barPh = document.getElementById('bar-ph');
-        const badgePh = document.getElementById('badge-ph');
-        if (valPh) valPh.textContent = Number(reading.ph).toFixed(2);
-        if (barPh) barPh.style.width = `${Math.min(100, Math.max(0, (reading.ph / 14) * 100))}%`;
-        if (badgePh) {
-            if (reading.ph < 6.0 || reading.ph > 9.0) {
-                badgePh.className = 'metric-status status-bad';
-                badgePh.textContent = 'ANOMALY';
-            } else if (reading.ph < 6.5 || reading.ph > 8.5) {
-                badgePh.className = 'metric-status status-warn';
-                badgePh.textContent = 'CAUTION';
-            } else {
-                badgePh.className = 'metric-status status-good';
-                badgePh.textContent = 'OPTIMAL';
-            }
-        }
+        const ph = Number(reading.ph);
+        const turb = Number(reading.turbidity);
+        const dox = Number(reading.do_mg_l);
+        const temp = Number(reading.temp_c);
 
-        // 2. Turbidity card
-        const valTurb = document.getElementById('val-turb');
-        const barTurb = document.getElementById('bar-turb');
-        const badgeTurb = document.getElementById('badge-turb');
-        if (valTurb) valTurb.textContent = Number(reading.turbidity).toFixed(1);
-        if (barTurb) barTurb.style.width = `${Math.min(100, Math.max(0, (reading.turbidity / 100) * 100))}%`;
-        if (badgeTurb) {
-            if (reading.turbidity > 50.0) {
-                badgeTurb.className = 'metric-status status-bad';
-                badgeTurb.textContent = 'HIGH TURBIDITY';
-            } else if (reading.turbidity > 25.0) {
-                badgeTurb.className = 'metric-status status-warn';
-                badgeTurb.textContent = 'MODERATE';
-            } else {
-                badgeTurb.className = 'metric-status status-good';
-                badgeTurb.textContent = 'CLEAR';
-            }
-        }
+        this.paintMetric('ph', ph, 2, 14, (ph < 6 || ph > 9) ? 'bad' : (ph < 6.5 || ph > 8.5) ? 'warn' : 'good');
+        this.paintMetric('turb', turb, 1, 50, turb > 50 ? 'bad' : turb > 25 ? 'warn' : 'good'); // bar spans 0–50 NTU
+        this.paintMetric('do', dox, 2, 14, dox < 4 ? 'bad' : dox < 6.5 ? 'warn' : 'good');
+        this.paintMetric('temp', temp, 1, 40, temp > 30 ? 'bad' : temp > 24 ? 'warn' : 'good');
 
-        // 3. Dissolved Oxygen card
-        const valDo = document.getElementById('val-do');
-        const barDo = document.getElementById('bar-do');
-        const badgeDo = document.getElementById('badge-do');
-        if (valDo) valDo.textContent = Number(reading.do_mg_l).toFixed(2);
-        if (barDo) barDo.style.width = `${Math.min(100, Math.max(0, (reading.do_mg_l / 14) * 100))}%`;
-        if (badgeDo) {
-            if (reading.do_mg_l < 4.0) {
-                badgeDo.className = 'metric-status status-bad';
-                badgeDo.textContent = 'HYPOXIC';
-            } else if (reading.do_mg_l < 6.5) {
-                badgeDo.className = 'metric-status status-warn';
-                badgeDo.textContent = 'LOW';
-            } else {
-                badgeDo.className = 'metric-status status-good';
-                badgeDo.textContent = 'HEALTHY';
-            }
-        }
+        // Battery and solar
+        const setText = (id, v) => { const el = document.getElementById(id); if (el && v !== undefined && v !== null) el.textContent = v; };
+        setText('val-battery-pct', Math.round(reading.battery_pct));
+        setText('val-battery-mv', reading.battery_mv);
+        setText('val-solar-pct', reading.solar_power_pct);
 
-        // 4. Temperature card
-        const valTemp = document.getElementById('val-temp');
-        const barTemp = document.getElementById('bar-temp');
-        if (valTemp) valTemp.textContent = Number(reading.temp_c).toFixed(1);
-        if (barTemp) barTemp.style.width = `${Math.min(100, Math.max(0, (reading.temp_c / 40) * 100))}%`;
-
-        // 5. Battery and Solar
-        const valBattPct = document.getElementById('val-battery-pct');
-        const valBattMv = document.getElementById('val-battery-mv');
-        const valSolarPct = document.getElementById('val-solar-pct');
-        if (valBattPct) valBattPct.textContent = Math.round(reading.battery_pct);
-        if (valBattMv) valBattMv.textContent = reading.battery_mv;
-        if (valSolarPct) valSolarPct.textContent = reading.solar_power_pct;
-
-        // 6. EKF NIS Badge & Bar
+        // EKF NIS badge & bar
+        const nis = Number(reading.ekf_nis);
         const nisBadge = document.getElementById('nis-badge');
         const nisBar = document.getElementById('nis-meter-bar');
-        if (nisBadge) nisBadge.textContent = `NIS: ${Number(reading.ekf_nis).toFixed(2)}`;
-        if (nisBar) {
-            const pct = Math.min(100, (reading.ekf_nis / 25.0) * 100);
-            nisBar.style.width = `${pct}%`;
+        if (Number.isFinite(nis)) {
+            if (nisBadge) nisBadge.textContent = `NIS: ${nis.toFixed(2)}`;
+            if (nisBar) nisBar.style.width = `${Math.min(100, (nis / 25.0) * 100)}%`;
         }
 
-        // 7. GPS Display
+        // GPS
         const gpsCoords = document.getElementById('gps-coords-display');
-        if (gpsCoords) {
+        if (gpsCoords && Number.isFinite(reading.latitude) && Number.isFinite(reading.longitude)) {
             const latStr = `${Math.abs(reading.latitude).toFixed(4)}° ${reading.latitude >= 0 ? 'N' : 'S'}`;
             const lonStr = `${Math.abs(reading.longitude).toFixed(4)}° ${reading.longitude >= 0 ? 'E' : 'W'}`;
             gpsCoords.textContent = `${latStr}, ${lonStr}`;
         }
 
-        // 8. Timestamp
+        // Timestamp
         const lastUpdate = document.getElementById('last-update-time');
-        if (lastUpdate) {
-            const d = new Date(reading.timestamp * 1000);
-            lastUpdate.textContent = d.toLocaleTimeString();
-        }
+        if (lastUpdate) lastUpdate.textContent = new Date(reading.timestamp * 1000).toLocaleTimeString();
 
-        // 9. Anomaly Banner & Log handling
         this.handleAnomalyState(reading);
-
-        // 10. Append to time-series chart
         this.appendChartData(reading);
     }
 
@@ -281,22 +241,32 @@ class DataOverlayManager {
         const bannerDesc = document.getElementById('banner-desc');
 
         if (reading.is_anomaly) {
-            if (banner) {
-                banner.classList.remove('hidden');
-                const reason = reading.anomaly_types && reading.anomaly_types.length > 0
-                    ? reading.anomaly_types.join(', ')
-                    : 'Contamination detected by EKF innovation';
+            this.calmReadings = 0;
+            const types = Array.isArray(reading.anomaly_types) ? reading.anomaly_types : [];
+            const key = types.join('|') || 'nis';
+
+            // Only react on onset or when the cause changes — not on every reading of a long event,
+            // so the log isn't flooded and a dismissed banner stays dismissed.
+            if (!this.inAnomaly || key !== this.lastAnomalyKey) {
+                const reason = types.length ? types.join(', ') : 'Contamination detected by EKF innovation';
                 if (bannerDesc) bannerDesc.textContent = `${reason} (NIS: ${Number(reading.ekf_nis).toFixed(2)} vs threshold 13.28).`;
+                if (banner) banner.classList.remove('hidden');
+                this.addAlertToLog(reading, types);
             }
-            this.addAlertToLog(reading);
+            this.inAnomaly = true;
+            this.lastAnomalyKey = key;
+        } else if (this.inAnomaly && ++this.calmReadings >= 3) {
+            // Clear the banner after three consecutive normal readings
+            this.inAnomaly = false;
+            this.lastAnomalyKey = '';
+            if (banner) banner.classList.add('hidden');
         }
     }
 
-    addAlertToLog(reading) {
+    addAlertToLog(reading, types) {
         const feed = document.getElementById('alert-history');
         if (!feed) return;
 
-        // Remove empty state placeholder if present
         const emptyMsg = feed.querySelector('.empty-alerts');
         if (emptyMsg) emptyMsg.remove();
 
@@ -304,26 +274,22 @@ class DataOverlayManager {
         const pill = document.getElementById('alert-count-pill');
         if (pill) pill.textContent = `${this.alertCount} Event${this.alertCount > 1 ? 's' : ''}`;
 
-        const alertItem = document.createElement('div');
-        alertItem.className = 'alert-item';
-        const d = new Date(reading.timestamp * 1000);
-        const timeStr = d.toLocaleTimeString();
+        // Built with textContent: anomaly strings come from the backend and must not be parsed as HTML
+        const flags = Number(reading.anomaly_flags) || 0;
+        const time = document.createElement('div');
+        time.className = 'alert-item-time';
+        time.textContent = `${new Date(reading.timestamp * 1000).toLocaleTimeString()} • Anomaly Flags: 0x${flags.toString(16).toUpperCase()}`;
 
-        const reasons = reading.anomaly_types && reading.anomaly_types.length > 0
-            ? reading.anomaly_types.join(' & ')
-            : 'Statistical NIS Deviation';
+        const msg = document.createElement('div');
+        msg.className = 'alert-item-msg';
+        msg.textContent = types.length ? types.join(' & ') : 'Statistical NIS Deviation';
 
-        alertItem.innerHTML = `
-            <div class="alert-item-time">${timeStr} • Anomaly Flags: 0x${reading.anomaly_flags.toString(16).toUpperCase()}</div>
-            <div class="alert-item-msg">${reasons}</div>
-        `;
+        const item = document.createElement('div');
+        item.className = 'alert-item';
+        item.append(time, msg);
+        feed.insertBefore(item, feed.firstChild);
 
-        feed.insertBefore(alertItem, feed.firstChild);
-
-        // Limit to 10 visible alerts
-        if (feed.children.length > 10) {
-            feed.removeChild(feed.lastChild);
-        }
+        while (feed.children.length > 10) feed.removeChild(feed.lastChild);
     }
 
     appendChartData(reading) {
@@ -367,18 +333,22 @@ class DataOverlayManager {
         const list = document.getElementById('waypoint-list');
         if (!list) return;
 
-        list.innerHTML = '';
-        waypoints.forEach((wp, idx) => {
+        const currentIdx = waypoints.findIndex(wp => !wp.target_reached);
+        list.replaceChildren(...waypoints.map((wp, idx) => {
             const item = document.createElement('div');
-            item.className = `waypoint-item ${idx === 1 ? 'current' : ''}`;
-            item.innerHTML = `
-                <div class="wp-name">WP-${wp.id + 1}: ${wp.label}</div>
-                <div class="wp-status ${wp.target_reached ? 'done' : 'active'}">
-                    ${wp.target_reached ? 'PASSED' : 'PATROL'}
-                </div>
-            `;
-            list.appendChild(item);
-        });
+            item.className = `waypoint-item${idx === currentIdx ? ' current' : ''}`;
+
+            const name = document.createElement('div');
+            name.className = 'wp-name';
+            name.textContent = `WP-${(Number.isFinite(wp.id) ? wp.id : idx) + 1}: ${wp.label}`;
+
+            const status = document.createElement('div');
+            status.className = `wp-status ${wp.target_reached ? 'done' : 'active'}`;
+            status.textContent = wp.target_reached ? 'PASSED' : 'PATROL';
+
+            item.append(name, status);
+            return item;
+        }));
     }
 }
 
