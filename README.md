@@ -64,7 +64,7 @@
 │   • Real-Time Rover GPS Path Tracking & Anomaly Beacon Strobe          │
 │   • Glassmorphic HUD Gauges (pH, Turbidity, DO, Temp, Power)           │
 │   • Rolling Multi-Metric Time-Series Trend Charts                      │
-│   • Contamination Alarm Feed & On-Demand Spill Simulation Demo         │
+│   • Contamination Alarm Feed & Real-Time Parameter Anomaly Diagnostics │
 └────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -214,18 +214,25 @@ Open your browser to:
 - **3D Digital-Twin Dashboard:** `http://localhost:8000/dashboard/`
 - **Interactive Swagger API Docs:** `http://localhost:8000/docs`
 
-> **Note:** The backend automatically starts in demonstration simulation mode, moving the 3D rover along its waypoint patrol route and broadcasting realistic water quality waves and solar cycling.
+> **Real-Time Hardware Operation:** The backend and 3D dashboard run in pure hardware telemetry mode. When waiting for incoming LoRa packets from field nodes, the HUD cleanly indicates `AWAITING NODE PACKET` with gauges in standby. As physical packets arrive via the LoRa gateway or `/api/v1/packet/raw`, the digital twin updates live with verified sensor readings, GPS positions, and signal stats.
 
-### 2. Testing the On-Demand Anomaly Detection
-Click the **"Simulate Spill"** button in the dashboard top navigation bar, or run:
+### 2. Ingesting Real Telemetry from Hardware
+Transmitting a real 32-byte binary packet from the field LoRa receiver:
 ```bash
-curl -X POST http://localhost:8000/api/v1/simulate/anomaly
+# Gateway forwards binary packets directly from USB UART receiver:
+python gateway/lora_receiver.py
 ```
-Observe the live response:
-1. EKF Innovation (NIS) spikes above $13.28$.
-2. The rover beacon light immediately turns crimson red.
-3. The glassmorphic Contamination Warning Banner pulses on-screen with parameter breach diagnostics.
-4. An entry is appended to the Anomaly Event Log.
+Or forward a raw packet directly to the API endpoint:
+```bash
+curl -X POST http://localhost:8000/api/v1/packet/raw \
+  -H "Content-Type: application/json" \
+  -d '{"hex_payload": "a0210000204eaf1e7047ecf8df0255001c039007c00e5200008400010100000000", "rssi": -78}'
+```
+Observe the live response on the dashboard:
+1. Status chip switches to **REAL-TIME HARDWARE FEED** with green indicator and current RSSI.
+2. Gauges immediately display genuine pH, turbidity, dissolved oxygen, water temperature, and battery/solar levels.
+3. If contamination thresholds or statistical EKF NIS divergence are triggered, the beacon turns crimson red with on-screen anomaly flags.
+4. Historical trends are continuously recorded into InfluxDB / SQLite.
 
 ### 3. Running Backend Automated Tests
 ```bash

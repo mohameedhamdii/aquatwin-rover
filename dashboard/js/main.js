@@ -3,7 +3,7 @@
  * @brief 3D Digital Twin Engine with Three.js — Water Shader, Shoreline, Rover Model & Real-Time Sync
  */
 
-// Shared geo/world constants so the mock-spill and telemetry mapping can't drift apart
+// Shared geo/world constants for hardware telemetry coordinate mapping
 const GEO_ORIGIN = { lat: 51.5074, lon: -0.1278 };
 const UNITS_PER_DEGREE = 12000.0;
 const LAKE_RADIUS = 38;
@@ -302,12 +302,14 @@ class DigitalTwinApp {
                 if (text) text.textContent = statusText;
             }
         );
-
-        // Used when the backend has no spill endpoint: inject a spill into the local generator
-        window.addEventListener('aqua:mockSpill', () => this.wsClient.injectSpill());
     }
 
     onTelemetryReceived(reading) {
+        if (!reading || reading.awaiting) {
+            this.overlayManager.updateTelemetryUI(reading);
+            return;
+        }
+
         // 1. Update HUD components & charts
         this.overlayManager.updateTelemetryUI(reading);
 

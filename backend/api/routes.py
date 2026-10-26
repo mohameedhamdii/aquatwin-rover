@@ -34,6 +34,8 @@ async def ingest_raw_packet(payload: RawPacketPayload, service: DataService = De
     try:
         raw_bytes = bytes.fromhex(payload.hex_payload.strip())
         reading = service.decode_binary_packet(raw_bytes)
+        if payload.rssi is not None:
+            reading.rssi = payload.rssi
         await service.ingest_reading(reading)
         return reading
     except ValueError as e:

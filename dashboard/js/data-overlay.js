@@ -16,6 +16,7 @@ class DataOverlayManager {
         this.initChart();
         this.setupEventListeners();
         this.loadInitialWaypoints();
+        this.loadInitialHistory();
     }
 
     setupEventListeners() {
@@ -34,20 +35,6 @@ class DataOverlayManager {
         if (btnDismiss) {
             btnDismiss.addEventListener('click', () => {
                 document.getElementById('anomaly-banner').classList.add('hidden');
-            });
-        }
-
-        // Simulate Spill button
-        const btnSpill = document.getElementById('btn-trigger-anomaly');
-        if (btnSpill) {
-            btnSpill.addEventListener('click', async () => {
-                // fetch() only rejects on network errors, so a 404/501 from a static server must be checked too
-                let ok = false;
-                try {
-                    const res = await fetch('/api/v1/simulate/anomaly', { method: 'POST' });
-                    ok = res.ok;
-                } catch (e) { /* no backend */ }
-                if (!ok) window.dispatchEvent(new CustomEvent('aqua:mockSpill'));
             });
         }
     }
@@ -195,21 +182,41 @@ class DataOverlayManager {
     }
 
     updateTelemetryUI(reading) {
+        if (!reading || reading.awaiting) {
+            const lastUpdate = document.getElementById('last-update-time');
+            if (lastUpdate) lastUpdate.textContent = 'Awaiting node transmission...';
+            return;
+        }
+
         const ph = Number(reading.ph);
         const turb = Number(reading.turbidity);
         const dox = Number(reading.do_mg_l);
         const temp = Number(reading.temp_c);
 
-        this.paintMetric('ph', ph, 2, 14, (ph < 6 || ph > 9) ? 'bad' : (ph < 6.5 || ph > 8.5) ? 'warn' : 'good');
-        this.paintMetric('turb', turb, 1, 50, turb > 50 ? 'bad' : turb > 25 ? 'warn' : 'good'); // bar spans 0–50 NTU
-        this.paintMetric('do', dox, 2, 14, dox < 4 ? 'bad' : dox < 6.5 ? 'warn' : 'good');
-        this.paintMetric('temp', temp, 1, 40, temp > 30 ? 'bad' : temp > 24 ? 'warn' : 'good');
+        if (Number.isFinite(ph)) {
+            this.paintMetric('ph', ph, 2, 14, (ph < 6 || ph > 9) ? 'bad' : (ph < 6.5 || ph > 8.5) ? 'warn' : 'good');
+        }
+        if (Number.isFinite(turb)) {
+            this.paintMetric('turb', turb, 1, 50, turb > 50 ? 'bad' : turb > 25 ? 'warn' : 'good'); // bar spans 0–50 NTU
+        }
+        if (Number.isFinite(dox)) {
+            this.paintMetric('do', dox, 2, 14, dox < 4 ? 'bad' : dox < 6.5 ? 'warn' : 'good');
+        }
+        if (Number.isFinite(temp)) {
+            this.paintMetric('temp', temp, 1, 40, temp > 30 ? 'bad' : temp > 24 ? 'warn' : 'good');
+        }
 
         // Battery and solar
         const setText = (id, v) => { const el = document.getElementById(id); if (el && v !== undefined && v !== null) el.textContent = v; };
-        setText('val-battery-pct', Math.round(reading.battery_pct));
-        setText('val-battery-mv', reading.battery_mv);
-        setText('val-solar-pct', reading.solar_power_pct);
+        if (Number.isFinite(Number(reading.battery_pct))) setText('val-battery-pct', Math.round(reading.battery_pct));
+        if (Number.isFinite(Number(reading.battery_mv))) setText('val-battery-mv', reading.battery_mv);
+        if (Number.isFinite(Number(reading.solar_power_pct))) setText('val-solar-pct', reading.solar_power_pct);
+
+        // Hardware LoRa RSSI
+        const loraRssi = document.getElementById('lora-rssi');
+        if (loraRssi && reading.rssi !== undefined && reading.rssi !== null) {
+            loraRssi.textContent = `${reading.rssi} dBm`;
+        }
 
         // EKF NIS badge & bar
         const nis = Number(reading.ekf_nis);
@@ -230,7 +237,9 @@ class DataOverlayManager {
 
         // Timestamp
         const lastUpdate = document.getElementById('last-update-time');
-        if (lastUpdate) lastUpdate.textContent = new Date(reading.timestamp * 1000).toLocaleTimeString();
+        if (lastUpdate && reading.timestamp) {
+            lastUpdate.textContent = new Date(reading.timestamp * 1000).toLocaleTimeString();
+        }
 
         this.handleAnomalyState(reading);
         this.appendChartData(reading);
@@ -293,15 +302,16 @@ class DataOverlayManager {
     }
 
     appendChartData(reading) {
-        if (!this.chart) return;
+        if (!this.chart || !reading || reading.awaiting) return;
+        if (!reading.timestamp) return;
 
         const timeLabel = new Date(reading.timestamp * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
         this.chart.data.labels.push(timeLabel);
-        this.chart.data.datasets[0].data.push(reading.ph);
-        this.chart.data.datasets[1].data.push(reading.turbidity);
-        this.chart.data.datasets[2].data.push(reading.do_mg_l);
-        this.chart.data.datasets[3].data.push(reading.ekf_nis);
+        this.chart.data.datasets[0].data.push(Number.isFinite(Number(reading.ph)) ? Number(reading.ph) : null);
+        this.chart.data.datasets[1].data.push(Number.isFinite(Number(reading.turbidity)) ? Number(reading.turbidity) : null);
+        this.chart.data.datasets[2].data.push(Number.isFinite(Number(reading.do_mg_l)) ? Number(reading.do_mg_l) : null);
+        this.chart.data.datasets[3].data.push(Number.isFinite(Number(reading.ekf_nis)) ? Number(reading.ekf_nis) : null);
 
         if (this.chart.data.labels.length > this.maxHistoryPoints) {
             this.chart.data.labels.shift();
@@ -309,6 +319,24 @@ class DataOverlayManager {
         }
 
         this.chart.update('none');
+    }
+
+    async loadInitialHistory() {
+        try {
+            const res = await fetch('/api/v1/data?limit=30');
+            if (res.ok) {
+                const points = await res.json();
+                if (Array.isArray(points) && points.length > 0) {
+                    for (const pt of points) {
+                        this.appendChartData(pt);
+                    }
+                    const latest = points[points.length - 1];
+                    this.updateTelemetryUI(latest);
+                }
+            }
+        } catch (e) {
+            console.info('[AquaTwin HUD] No previous telemetry history loaded:', e.message);
+        }
     }
 
     async loadInitialWaypoints() {

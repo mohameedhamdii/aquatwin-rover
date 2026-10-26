@@ -119,11 +119,12 @@ def test_api_post_raw_packet(client):
     raw_bytes = service.encode_binary_packet(test_reading)
     hex_str = raw_bytes.hex()
 
-    res = client.post("/api/v1/packet/raw", json={"hex_payload": hex_str})
+    res = client.post("/api/v1/packet/raw", json={"hex_payload": hex_str, "rssi": -78})
     assert res.status_code == 200
     data = res.json()
     assert data["device_id"] == 3
     assert abs(data["ph"] - 6.85) < 0.05
+    assert data["rssi"] == -78
 
 def test_api_get_historical_and_latest(client):
     res = client.get("/api/v1/latest")

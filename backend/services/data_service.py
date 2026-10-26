@@ -61,24 +61,14 @@ class DataService:
         ]
         self.current_waypoint_idx = 0
 
-        # Preload nominal starting reading
-        self.latest_reading = WaterQualityReading(
-            timestamp=int(time.time()),
-            device_id=1,
-            latitude=51.5074,
-            longitude=-0.1278,
-            ph=7.32,
-            turbidity=6.8,
-            do_mg_l=8.45,
-            temp_c=19.4,
-            battery_mv=3950,
-            battery_pct=75.0,
-            solar_power_pct=85,
-            anomaly_flags=0,
-            ekf_nis=1.12,
-            is_anomaly=False,
-            anomaly_types=[]
-        )
+        # Load most recent real hardware reading from database if available
+        stored_readings = self.storage.query_telemetry(limit=1)
+        if stored_readings:
+            self.latest_reading = stored_readings[0]
+            logger.info(f"Loaded latest verified hardware reading from timestamp {self.latest_reading.timestamp}")
+        else:
+            self.latest_reading = None
+            logger.info("Real-time hardware mode: awaiting first telemetry transmission from field node.")
 
     def decode_binary_packet(self, raw_bytes: bytes) -> WaterQualityReading:
         """

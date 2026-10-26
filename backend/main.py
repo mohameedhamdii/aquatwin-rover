@@ -3,6 +3,7 @@ Main entry point for the Water Quality Monitoring Backend & WebSocket Server.
 """
 
 import os
+import json
 import yaml
 import logging
 import asyncio
@@ -85,6 +86,11 @@ async def websocket_live_endpoint(websocket: WebSocket):
         # Send latest reading immediately on connection
         if data_service.latest_reading:
             await websocket.send_text(data_service.latest_reading.model_dump_json())
+        else:
+            await websocket.send_text(json.dumps({
+                "type": "awaiting_telemetry",
+                "message": "Gateway active. Awaiting initial LoRa packet transmission from field hardware node..."
+            }))
 
         # Keep alive and listen for client messages / commands
         while True:

@@ -22,6 +22,7 @@ class WaterQualityReading(BaseModel):
     ekf_nis: float = Field(default=1.2, description="Normalized Innovation Squared (EKF)")
     is_anomaly: bool = Field(default=False, description="True if any anomaly triggered")
     anomaly_types: List[str] = Field(default_factory=list, description="Descriptive list of active anomalies")
+    rssi: Optional[int] = Field(default=None, description="LoRa RSSI in dBm")
 
 class RawPacketPayload(BaseModel):
     hex_payload: str = Field(..., description="Hex-encoded 32-byte binary LoRa packet")

@@ -28,5 +28,5 @@ thresholds:
   ekf_nis_max: 13.28
 
 simulator:
-  auto_generate_mock_data: true
+  auto_generate_mock_data: false  # Pure real-time hardware mode (receives real LoRa/HTTP packets)
   mock_interval_seconds: 5.0

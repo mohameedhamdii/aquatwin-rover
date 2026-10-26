@@ -54,7 +54,7 @@
                 </div>
                 <div class="mission-mode-badge" id="mission-mode-badge">
                     <span class="mode-dot"></span>
-                    <span id="rover-mode-text">ROVER PATROL MODE</span>
+                    <span id="rover-mode-text">REAL-TIME HARDWARE MONITOR</span>
                 </div>
             </div>
 
@@ -76,15 +76,16 @@
             <div class="nav-right">
                 <div class="status-chip" id="lora-status-chip">
                     <i class="fa-solid fa-tower-broadcast"></i>
-                    <span>LoRa 868MHz <strong id="lora-rssi">-78 dBm</strong></span>
+                    <span>LoRa 868MHz <strong id="lora-rssi">-- dBm</strong></span>
+                </div>
+                <div class="status-chip" id="source-chip">
+                    <i class="fa-solid fa-microchip"></i>
+                    <span id="data-source-text">HARDWARE FEED</span>
                 </div>
                 <div class="status-chip" id="ws-status-chip">
                     <span class="ws-indicator live" id="ws-indicator-dot"></span>
-                    <span id="ws-status-text">LIVE STREAM</span>
+                    <span id="ws-status-text">CONNECTING...</span>
                 </div>
-                <button id="btn-trigger-anomaly" class="btn-danger-pill" title="Inject Mock Contamination Event to Test Detection">
-                    <i class="fa-solid fa-vial-virus"></i> Simulate Spill
-                </button>
             </div>
         </header>
 
@@ -97,7 +98,7 @@
                         <i class="fa-solid fa-chart-pie"></i>
                         <h3>Water Quality Metrics</h3>
                     </div>
-                    <span class="telemetry-ts" id="last-update-time">Just now</span>
+                    <span class="telemetry-ts" id="last-update-time">Awaiting node transmission...</span>
                 </div>
 
                 <div class="gauges-grid">
@@ -105,15 +106,15 @@
                     <div class="metric-card" id="card-ph">
                         <div class="metric-top">
                             <span class="metric-label"><i class="fa-solid fa-flask"></i> Acidity (pH)</span>
-                            <span class="metric-status status-good" id="badge-ph">OPTIMAL</span>
+                            <span class="metric-status status-good" id="badge-ph">STANDBY</span>
                         </div>
                         <div class="metric-body">
                             <div class="metric-value-container">
-                                <span class="metric-num" id="val-ph">7.34</span>
+                                <span class="metric-num" id="val-ph">--</span>
                                 <span class="metric-unit">pH</span>
                             </div>
                             <div class="metric-bar-wrap">
-                                <div class="metric-bar" id="bar-ph" style="width: 52%;"></div>
+                                <div class="metric-bar" id="bar-ph" style="width: 0%;"></div>
                             </div>
                             <div class="metric-scale-limits">
                                 <span>0 Acid</span>
@@ -127,15 +128,15 @@
                     <div class="metric-card" id="card-turb">
                         <div class="metric-top">
                             <span class="metric-label"><i class="fa-solid fa-smog"></i> Turbidity</span>
-                            <span class="metric-status status-good" id="badge-turb">CLEAR</span>
+                            <span class="metric-status status-good" id="badge-turb">STANDBY</span>
                         </div>
                         <div class="metric-body">
                             <div class="metric-value-container">
-                                <span class="metric-num" id="val-turb">6.5</span>
+                                <span class="metric-num" id="val-turb">--</span>
                                 <span class="metric-unit">NTU</span>
                             </div>
                             <div class="metric-bar-wrap">
-                                <div class="metric-bar warning-bar" id="bar-turb" style="width: 13%;"></div>
+                                <div class="metric-bar warning-bar" id="bar-turb" style="width: 0%;"></div>
                             </div>
                             <div class="metric-scale-limits">
                                 <span>0 Crystal</span>
@@ -149,15 +150,15 @@
                     <div class="metric-card" id="card-do">
                         <div class="metric-top">
                             <span class="metric-label"><i class="fa-solid fa-wind"></i> Dissolved O₂</span>
-                            <span class="metric-status status-good" id="badge-do">HEALTHY</span>
+                            <span class="metric-status status-good" id="badge-do">STANDBY</span>
                         </div>
                         <div class="metric-body">
                             <div class="metric-value-container">
-                                <span class="metric-num" id="val-do">8.42</span>
+                                <span class="metric-num" id="val-do">--</span>
                                 <span class="metric-unit">mg/L</span>
                             </div>
                             <div class="metric-bar-wrap">
-                                <div class="metric-bar" id="bar-do" style="width: 60%;"></div>
+                                <div class="metric-bar" id="bar-do" style="width: 0%;"></div>
                             </div>
                             <div class="metric-scale-limits">
                                 <span>&lt; 4 Hypoxic</span>
@@ -171,15 +172,15 @@
                     <div class="metric-card" id="card-temp">
                         <div class="metric-top">
                             <span class="metric-label"><i class="fa-solid fa-temperature-half"></i> Water Temp</span>
-                            <span class="metric-status status-good" id="badge-temp">NORMAL</span>
+                            <span class="metric-status status-good" id="badge-temp">STANDBY</span>
                         </div>
                         <div class="metric-body">
                             <div class="metric-value-container">
-                                <span class="metric-num" id="val-temp">19.4</span>
+                                <span class="metric-num" id="val-temp">--</span>
                                 <span class="metric-unit">°C</span>
                             </div>
                             <div class="metric-bar-wrap">
-                                <div class="metric-bar" id="bar-temp" style="width: 48%;"></div>
+                                <div class="metric-bar" id="bar-temp" style="width: 0%;"></div>
                             </div>
                             <div class="metric-scale-limits">
                                 <span>0 °C</span>
@@ -198,7 +199,7 @@
                         </div>
                         <div class="power-info">
                             <span class="power-label">LiPo Battery</span>
-                            <span class="power-val"><strong id="val-battery-pct">82</strong>% (<span id="val-battery-mv">3940</span> mV)</span>
+                            <span class="power-val"><strong id="val-battery-pct">--</strong>% (<span id="val-battery-mv">--</span> mV)</span>
                         </div>
                     </div>
                     <div class="power-item">
@@ -207,7 +208,7 @@
                         </div>
                         <div class="power-info">
                             <span class="power-label">Solar MPPT</span>
-                            <span class="power-val"><strong id="val-solar-pct">75</strong>% Generation</span>
+                            <span class="power-val"><strong id="val-solar-pct">--</strong>% Generation</span>
                         </div>
                     </div>
                 </div>

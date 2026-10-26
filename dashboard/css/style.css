@@ -326,6 +326,11 @@ body {
     box-shadow: 0 0 8px var(--emerald-safe);
 }
 
+.ws-indicator.waiting {
+    background: var(--amber-warning);
+    box-shadow: 0 0 8px var(--amber-warning);
+}
+
 .ws-indicator.offline {
     background: var(--rose-danger);
     box-shadow: 0 0 8px var(--rose-danger);

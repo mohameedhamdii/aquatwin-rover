@@ -70,13 +70,18 @@ def run_serial_receiver(config: dict):
 
     logger.info(f"Opening LoRa serial connection on {port} @ {baud} baud...")
 
-    try:
-        ser = serial.Serial(port, baudrate=baud, timeout=2.0)
-    except Exception as e:
-        logger.error(f"Could not open serial port {port}: {e}")
-        logger.info("Falling back to simulated demo loop mode. Use --demo flag to run without hardware.")
-        run_demo_receiver(config)
-        return
+    ser = None
+    while ser is None:
+        try:
+            ser = serial.Serial(port, baudrate=baud, timeout=2.0)
+            logger.info(f"Successfully opened LoRa receiver serial port on {port} @ {baud} baud.")
+        except Exception as e:
+            logger.warning(f"Could not open serial port {port} ({e}). Retrying in 5s... (Ensure LoRa USB transceiver is plugged in, or pass --demo for test mode)")
+            try:
+                time.sleep(5.0)
+            except KeyboardInterrupt:
+                logger.info("Gateway receiver terminated by user.")
+                return
 
     logger.info("Listening for incoming LoRa RF frames...")
     buffer = bytearray()
